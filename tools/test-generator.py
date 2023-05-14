@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import sys
 import math
 import urllib
-import httplib
+import http.client as httplib
 import time
 import random
 
@@ -15,12 +15,12 @@ device_speed = 40
 driver_id = '123456'
 
 waypoints = [
-    (40.722412, -74.006288),
-    (40.728592, -74.005258),
-    (40.728348, -74.002822),
-    (40.725437, -73.996750),
-    (40.721778, -73.999818),
-    (40.723323, -74.002994)
+    (48.853780, 2.344347),
+    (48.855235, 2.345852),
+    (48.857238, 2.347153),
+    (48.858509, 2.342563),
+    (48.856066, 2.340432),
+    (48.854780, 2.342230)
 ]
 
 points = []
@@ -35,12 +35,14 @@ for i in range(0, len(waypoints)):
         lon = lon1 + (lon2 - lon1) * j / count
         points.append((lat, lon))
 
-def send(conn, lat, lon, course, speed, alarm, ignition, accuracy, rpm, fuel, driverUniqueId):
-    params = (('id', id), ('timestamp', int(time.time())), ('lat', lat), ('lon', lon), ('bearing', course), ('speed', speed))
+def send(conn, lat, lon, altitude, course, speed, battery, alarm, ignition, accuracy, rpm, fuel, driverUniqueId):
+    params = (('id', id), ('timestamp', int(time.time())), ('lat', lat), ('lon', lon), ('altitude', altitude), ('bearing', course), ('speed', speed), ('batt', battery))
     if alarm:
         params = params + (('alarm', 'sos'),)
     if ignition:
         params = params + (('ignition', 'true'),)
+    else:
+        params = params + (('ignition', 'false'),)
     if accuracy:
         params = params + (('accuracy', accuracy),)
     if rpm:
@@ -49,7 +51,7 @@ def send(conn, lat, lon, course, speed, alarm, ignition, accuracy, rpm, fuel, dr
         params = params + (('fuel', fuel),)
     if driverUniqueId:
         params = params + (('driverUniqueId', driverUniqueId),)
-    conn.request('GET', '?' + urllib.urlencode(params))
+    conn.request('GET', '?' + urllib.parse.urlencode(params))
     conn.getresponse().read()
 
 def course(lat1, lon1, lat2, lon2):
@@ -68,13 +70,15 @@ conn = httplib.HTTPConnection(server)
 while True:
     (lat1, lon1) = points[index % len(points)]
     (lat2, lon2) = points[(index + 1) % len(points)]
+    altitude = 50
     speed = device_speed if (index % len(points)) != 0 else 0
     alarm = (index % 10) == 0
-    ignition = (index % len(points)) != 0
+    battery = random.randint(0, 100)
+    ignition = (index / 10 % 2) != 0
     accuracy = 100 if (index % 10) == 0 else 0
     rpm = random.randint(500, 4000)
     fuel = random.randint(0, 80)
     driverUniqueId = driver_id if (index % len(points)) == 0 else False
-    send(conn, lat1, lon1, course(lat1, lon1, lat2, lon2), speed, alarm, ignition, accuracy, rpm, fuel, driverUniqueId)
+    send(conn, lat1, lon1, altitude, course(lat1, lon1, lat2, lon2), speed, battery, alarm, ignition, accuracy, rpm, fuel, driverUniqueId)
     time.sleep(period)
     index += 1

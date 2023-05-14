@@ -7,3 +7,8 @@ nbactions.xml
 *.iml
 .DS_Store
 .checkstyle
+.gradle
+out
+build
+.vscode
+bin
