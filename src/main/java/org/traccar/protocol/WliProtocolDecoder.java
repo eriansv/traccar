@@ -86,9 +86,9 @@ public class WliProtocolDecoder extends BaseProtocolDecoder {
                         position.setLatitude(buf.readInt() / 600000.0);
                         position.setLongitude(buf.readInt() / 600000.0);
                         position.setSpeed(buf.readUnsignedShort());
-                        position.setCourse(buf.readUnsignedShort() * 0.1);
+                        position.setCourse(buf.readUnsignedShort() / 10.0);
                         position.set(Position.KEY_ODOMETER, UnitsConverter.metersFromFeet(buf.readUnsignedInt()));
-                        position.setAltitude(buf.readInt() * 0.1);
+                        position.setAltitude(buf.readInt() / 10.0);
                     }
 
                     buf.readerIndex(endIndex);
@@ -99,54 +99,28 @@ public class WliProtocolDecoder extends BaseProtocolDecoder {
                     String value = buf.readCharSequence(
                             endIndex - buf.readerIndex(), StandardCharsets.US_ASCII).toString();
 
-                    int networkFieldsOffset;
-                    switch (type) {
-                        case 0xE4:
-                            networkFieldsOffset = 10;
-                            break;
-                        case 0xCB:
-                            networkFieldsOffset = 80;
-                            break;
-                        case 0x1E:
-                            networkFieldsOffset = 182;
-                            break;
-                        case 0xC9:
-                        default:
-                            networkFieldsOffset = 35;
-                            break;
-                    }
+                    int networkFieldsOffset = switch (type) {
+                        case 0xE4 -> 10;
+                        case 0xCB -> 80;
+                        case 0x1E -> 182;
+                        default -> 35;
+                    };
                     if (fieldNumber - networkFieldsOffset >= 0 && fieldNumber - networkFieldsOffset < 10) {
                         switch (fieldNumber - networkFieldsOffset) {
-                            case 0:
-                                cellTower.setMobileCountryCode(Integer.parseInt(value));
-                                break;
-                            case 1:
-                                cellTower.setMobileNetworkCode(Integer.parseInt(value));
-                                break;
-                            case 2:
-                                cellTower.setLocationAreaCode(Integer.parseInt(value));
-                                break;
-                            case 3:
-                                cellTower.setCellId(Long.parseLong(value));
-                                break;
-                            case 4:
-                                cellTower.setSignalStrength(Integer.parseInt(value));
-                                break;
-                            default:
-                                break;
+                            case 0 -> cellTower.setMobileCountryCode(Integer.parseInt(value));
+                            case 1 -> cellTower.setMobileNetworkCode(Integer.parseInt(value));
+                            case 2 -> cellTower.setLocationAreaCode(Integer.parseInt(value));
+                            case 3 -> cellTower.setCellId(Long.parseLong(value));
+                            case 4 -> cellTower.setSignalStrength(Integer.parseInt(value));
                         }
                     } else {
                         switch (fieldNumber) {
-                            case 246:
+                            case 246 -> {
                                 String[] values = value.split(",");
-                                position.set(Position.KEY_POWER, Integer.parseInt(values[2]) * 0.01);
-                                position.set(Position.KEY_BATTERY, Integer.parseInt(values[3]) * 0.01);
-                                break;
-                            case 255:
-                                position.setDeviceTime(new Date(Long.parseLong(value) * 1000));
-                                break;
-                            default:
-                                break;
+                                position.set(Position.KEY_POWER, Integer.parseInt(values[2]) / 100.0);
+                                position.set(Position.KEY_BATTERY, Integer.parseInt(values[3]) / 100.0);
+                            }
+                            case 255 -> position.setDeviceTime(new Date(Long.parseLong(value) * 1000));
                         }
                     }
 

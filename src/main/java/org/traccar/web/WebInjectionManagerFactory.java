@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Anton Tananaev (anton@traccar.org)
+ * Copyright 2022 - 2025 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.traccar.web;
 
+import jakarta.ws.rs.core.Configuration;
 import org.glassfish.hk2.api.ServiceLocator;
 import org.glassfish.jersey.inject.hk2.Hk2InjectionManagerFactory;
 import org.glassfish.jersey.internal.inject.InjectionManager;
@@ -23,7 +24,7 @@ import org.jvnet.hk2.guice.bridge.api.GuiceBridge;
 import org.jvnet.hk2.guice.bridge.api.GuiceIntoHK2Bridge;
 import org.traccar.Main;
 
-import javax.annotation.Priority;
+import jakarta.annotation.Priority;
 
 @Priority(20)
 public class WebInjectionManagerFactory implements InjectionManagerFactory {
@@ -47,4 +48,10 @@ public class WebInjectionManagerFactory implements InjectionManagerFactory {
     public InjectionManager create(Object parent) {
         return injectGuiceBridge(originalFactory.create(parent));
     }
+
+    @Override
+    public InjectionManager create(Object parent, Configuration configuration) {
+        return injectGuiceBridge(originalFactory.create(parent, configuration));
+    }
+
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2022 Anton Tananaev (anton@traccar.org)
+ * Copyright 2012 - 2026 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,9 @@
 package org.traccar;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
 import org.traccar.config.Keys;
 import org.traccar.database.CommandsManager;
 import org.traccar.database.MediaManager;
@@ -29,9 +31,8 @@ import org.traccar.model.Position;
 import org.traccar.session.ConnectionManager;
 import org.traccar.session.DeviceSession;
 import org.traccar.session.cache.CacheManager;
-import org.traccar.storage.StorageException;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Collection;
@@ -51,6 +52,10 @@ public abstract class BaseProtocolDecoder extends ExtendedObjectDecoder {
     private StatisticsManager statisticsManager;
     private MediaManager mediaManager;
     private CommandsManager commandsManager;
+
+    private String modelOverride;
+
+    private ByteBuf mediaBuffer;
 
     public BaseProtocolDecoder(Protocol protocol) {
         this.protocol = protocol;
@@ -93,6 +98,41 @@ public abstract class BaseProtocolDecoder extends ExtendedObjectDecoder {
         return mediaManager.writeFile(uniqueId, buf, extension);
     }
 
+    public String writeMediaFile(String uniqueId, String extension) {
+        try {
+            return mediaManager.writeFile(uniqueId, mediaBuffer, extension);
+        } finally {
+            releaseMediaBuffer();
+        }
+    }
+
+    public ByteBuf getMediaBuffer() {
+        return mediaBuffer;
+    }
+
+    public ByteBuf newMediaBuffer() {
+        return newMediaBuffer(0);
+    }
+
+    public ByteBuf newMediaBuffer(int size) {
+        releaseMediaBuffer();
+        mediaBuffer = Unpooled.buffer(size, getConfig().getInteger(Keys.MEDIA_BUFFER_SIZE));
+        return mediaBuffer;
+    }
+
+    private void releaseMediaBuffer() {
+        if (mediaBuffer != null) {
+            mediaBuffer.release();
+            mediaBuffer = null;
+        }
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+        releaseMediaBuffer();
+    }
+
     public String getProtocolName() {
         return protocol != null ? protocol.getName() : PROTOCOL_UNKNOWN;
     }
@@ -107,17 +147,12 @@ public abstract class BaseProtocolDecoder extends ExtendedObjectDecoder {
     }
 
     protected double convertSpeed(double value, String defaultUnits) {
-        switch (getConfig().getString(getProtocolName() + ".speed", defaultUnits)) {
-            case "kmh":
-                return UnitsConverter.knotsFromKph(value);
-            case "mps":
-                return UnitsConverter.knotsFromMps(value);
-            case "mph":
-                return UnitsConverter.knotsFromMph(value);
-            case "kn":
-            default:
-                return value;
-        }
+        return switch (getConfig().getString(Keys.PROTOCOL_SPEED.withPrefix(getProtocolName()), defaultUnits)) {
+            case "kmh" -> UnitsConverter.knotsFromKph(value);
+            case "mps" -> UnitsConverter.knotsFromMps(value);
+            case "mph" -> UnitsConverter.knotsFromMph(value);
+            default -> value;
+        };
     }
 
     protected TimeZone getTimeZone(long deviceId) {
@@ -125,44 +160,36 @@ public abstract class BaseProtocolDecoder extends ExtendedObjectDecoder {
     }
 
     protected TimeZone getTimeZone(long deviceId, String defaultTimeZone) {
-        TimeZone result = TimeZone.getTimeZone(defaultTimeZone);
         String timeZoneName = AttributeUtil.lookup(cacheManager, Keys.DECODER_TIMEZONE, deviceId);
         if (timeZoneName != null) {
-            result = TimeZone.getTimeZone(timeZoneName);
+            return TimeZone.getTimeZone(timeZoneName);
+        } else if (defaultTimeZone != null) {
+            return TimeZone.getTimeZone(defaultTimeZone);
         }
-        return result;
+        return null;
     }
 
     public DeviceSession getDeviceSession(Channel channel, SocketAddress remoteAddress, String... uniqueIds) {
         try {
             return connectionManager.getDeviceSession(protocol, channel, remoteAddress, uniqueIds);
-        } catch (StorageException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void setModelOverride(String modelOverride) {
+        this.modelOverride = modelOverride;
+    }
+
+    public String getDeviceModel(DeviceSession deviceSession) {
+        return modelOverride != null ? modelOverride : deviceSession.getModel();
     }
 
     public void getLastLocation(Position position, Date deviceTime) {
         if (position.getDeviceId() != 0) {
             position.setOutdated(true);
-
-            Position last = cacheManager.getPosition(position.getDeviceId());
-            if (last != null) {
-                position.setFixTime(last.getFixTime());
-                position.setValid(last.getValid());
-                position.setLatitude(last.getLatitude());
-                position.setLongitude(last.getLongitude());
-                position.setAltitude(last.getAltitude());
-                position.setSpeed(last.getSpeed());
-                position.setCourse(last.getCourse());
-                position.setAccuracy(last.getAccuracy());
-            } else {
-                position.setFixTime(new Date(0));
-            }
-
             if (deviceTime != null) {
                 position.setDeviceTime(deviceTime);
-            } else {
-                position.setDeviceTime(new Date());
             }
         }
     }
@@ -174,15 +201,14 @@ public abstract class BaseProtocolDecoder extends ExtendedObjectDecoder {
             statisticsManager.registerMessageReceived();
         }
         Set<Long> deviceIds = new HashSet<>();
-        if (decodedMessage != null) {
-            if (decodedMessage instanceof Position) {
-                deviceIds.add(((Position) decodedMessage).getDeviceId());
-            } else if (decodedMessage instanceof Collection) {
-                Collection<Position> positions = (Collection) decodedMessage;
-                for (Position position : positions) {
-                    deviceIds.add(position.getDeviceId());
+        switch (decodedMessage) {
+            case Position position -> deviceIds.add(position.getDeviceId());
+            case Collection<?> positions -> {
+                for (Object position : positions) {
+                    deviceIds.add(((Position) position).getDeviceId());
                 }
             }
+            case null, default -> {}
         }
         if (deviceIds.isEmpty()) {
             DeviceSession deviceSession = getDeviceSession(channel, remoteAddress);

@@ -15,10 +15,10 @@
  */
 package org.traccar.geocoder;
 
-import javax.json.JsonArray;
-import javax.json.JsonObject;
-import javax.json.JsonString;
-import javax.ws.rs.client.Client;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonString;
+import jakarta.ws.rs.client.Client;
 
 public class MapboxGeocoder extends JsonGeocoder {
 
@@ -37,7 +37,7 @@ public class MapboxGeocoder extends JsonGeocoder {
         if (!features.isEmpty()) {
             Address address = new Address();
 
-            JsonObject mostSpecificFeature = (JsonObject) features.get(0);
+            JsonObject mostSpecificFeature = (JsonObject) features.getFirst();
 
             if (mostSpecificFeature.containsKey("place_name")) {
                 address.setFormattedAddress(mostSpecificFeature.getString("place_name"));

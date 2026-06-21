@@ -25,7 +25,7 @@ import org.traccar.config.Config;
 import org.traccar.config.Keys;
 import org.traccar.model.Command;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class XexunProtocol extends BaseProtocol {
 
@@ -39,7 +39,7 @@ public class XexunProtocol extends BaseProtocol {
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {
                 boolean full = config.getBoolean(Keys.PROTOCOL_EXTENDED.withPrefix(getName()));
                 if (full) {
-                    pipeline.addLast(new LineBasedFrameDecoder(1024)); // tracker bug \n\r
+                    pipeline.addLast(new LineBasedFrameDecoder(MAX_FRAME_LENGTH)); // tracker bug \n\r
                 } else {
                     pipeline.addLast(new XexunFrameDecoder());
                 }

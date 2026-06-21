@@ -16,6 +16,7 @@
 package org.traccar.protocol;
 
 import org.traccar.BaseFrameDecoder;
+import org.traccar.BaseProtocol;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -25,11 +26,15 @@ public class TeltonikaFrameDecoder extends BaseFrameDecoder {
 
     private static final int MESSAGE_MINIMUM_LENGTH = 12;
 
+    public TeltonikaFrameDecoder() {
+        super(BaseProtocol.MAX_FRAME_LENGTH_LARGE);
+    }
+
     @Override
     protected Object decode(
             ChannelHandlerContext ctx, Channel channel, ByteBuf buf) throws Exception {
 
-        while (buf.isReadable() && buf.getByte(buf.readerIndex()) == (byte) 0xff) {
+        if (buf.isReadable() && buf.getByte(buf.readerIndex()) == (byte) 0xff) {
             return buf.readRetainedSlice(1);
         }
 

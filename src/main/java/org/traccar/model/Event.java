@@ -35,8 +35,7 @@ public class Event extends Message {
         eventTime = new Date();
     }
 
-    public Event() {
-    }
+    public Event() {}
 
     public static final String ALL_EVENTS = "allEvents";
 
@@ -46,6 +45,7 @@ public class Event extends Message {
     public static final String TYPE_DEVICE_UNKNOWN = "deviceUnknown";
     public static final String TYPE_DEVICE_OFFLINE = "deviceOffline";
     public static final String TYPE_DEVICE_INACTIVE = "deviceInactive";
+    public static final String TYPE_QUEUED_COMMAND_SENT = "queuedCommandSent";
 
     public static final String TYPE_DEVICE_MOVING = "deviceMoving";
     public static final String TYPE_DEVICE_STOPPED = "deviceStopped";
@@ -57,13 +57,16 @@ public class Event extends Message {
     public static final String TYPE_GEOFENCE_ENTER = "geofenceEnter";
     public static final String TYPE_GEOFENCE_EXIT = "geofenceExit";
 
+    public static final String TYPE_PROXIMITY_ENTER = "proximityEnter";
+    public static final String TYPE_PROXIMITY_EXIT = "proximityExit";
+    public static final String TYPE_UNACCOMPANIED_MOTION = "unaccompaniedMotion";
+
     public static final String TYPE_ALARM = "alarm";
 
     public static final String TYPE_IGNITION_ON = "ignitionOn";
     public static final String TYPE_IGNITION_OFF = "ignitionOff";
 
     public static final String TYPE_MAINTENANCE = "maintenance";
-    public static final String TYPE_TEXT_MESSAGE = "textMessage";
     public static final String TYPE_DRIVER_CHANGED = "driverChanged";
     public static final String TYPE_MEDIA = "media";
 

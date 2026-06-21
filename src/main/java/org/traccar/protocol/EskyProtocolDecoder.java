@@ -49,7 +49,7 @@ public class EskyProtocolDecoder extends BaseProtocolDecoder {
             .number("(d+.d+)[+;]")               // speed
             .number("(d+)[+;]")                  // course
             .groupBegin()
-            .text("0x").number("(d+)[+;]")       // input
+            .text("0x").number("(x+)[+;]")       // input
             .number("(d+)[+;]")                  // message type
             .number("(d+)[+;]")                  // odometer
             .groupEnd("?")
@@ -95,7 +95,7 @@ public class EskyProtocolDecoder extends BaseProtocolDecoder {
         }
 
         position.set(Position.PREFIX_ADC + 1, parser.nextInt());
-        position.set(Position.KEY_BATTERY, parser.nextInt() * 0.01);
+        position.set(Position.KEY_BATTERY, parser.nextInt() / 100.0);
 
         int index = sentence.lastIndexOf('+');
         if (index > 0 && channel instanceof DatagramChannel) {

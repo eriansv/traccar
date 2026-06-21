@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Anton Tananaev (anton@traccar.org)
+ * Copyright 2022 - 2026 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,17 +24,19 @@ import liquibase.Liquibase;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.exception.LiquibaseException;
+import liquibase.exception.LockException;
 import liquibase.resource.DirectoryResourceAccessor;
 import liquibase.resource.ResourceAccessor;
 import org.traccar.config.Config;
 import org.traccar.config.Keys;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import javax.sql.DataSource;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URL;
+import java.nio.file.Path;
 
 public class DatabaseModule extends AbstractModule {
 
@@ -71,33 +73,51 @@ public class DatabaseModule extends AbstractModule {
         hikariConfig.setConnectionInitSql(config.getString(Keys.DATABASE_CHECK_CONNECTION));
         hikariConfig.setIdleTimeout(600000);
 
-        int maxPoolSize = config.getInteger(Keys.DATABASE_MAX_POOL_SIZE);
-        if (maxPoolSize != 0) {
-            hikariConfig.setMaximumPoolSize(maxPoolSize);
+        int maxLifetime = config.getInteger(Keys.DATABASE_MAX_LIFETIME);
+        if (maxLifetime != 0) {
+            hikariConfig.setMaxLifetime(maxLifetime);
         }
+        hikariConfig.setMaximumPoolSize(config.getInteger(Keys.DATABASE_MAX_POOL_SIZE));
 
         DataSource dataSource = new HikariDataSource(hikariConfig);
 
-        if (config.hasKey(Keys.DATABASE_CHANGELOG)) {
+        String changelog = config.getString(Keys.DATABASE_CHANGELOG);
+        if (changelog != null && !changelog.isEmpty()) {
 
-            ResourceAccessor resourceAccessor = new DirectoryResourceAccessor(new File("."));
+            Path changelogPath = Path.of(changelog).toAbsolutePath().normalize();
+            ResourceAccessor resourceAccessor = new DirectoryResourceAccessor(changelogPath.getParent());
+            String changelogName = changelogPath.getFileName().toString();
 
-            Database database = DatabaseFactory.getInstance().openDatabase(
-                    config.getString(Keys.DATABASE_URL),
-                    config.getString(Keys.DATABASE_USER),
-                    config.getString(Keys.DATABASE_PASSWORD),
-                    config.getString(Keys.DATABASE_DRIVER),
-                    null, null, null, resourceAccessor);
+            System.setProperty("liquibase.changelogLockWaitTimeInMinutes", "1");
+            System.setProperty("liquibase.analytics.enabled", "false");
 
-            String changelog = config.getString(Keys.DATABASE_CHANGELOG);
+            try {
+                Database database = DatabaseFactory.getInstance().openDatabase(
+                        config.getString(Keys.DATABASE_URL),
+                        config.getString(Keys.DATABASE_USER),
+                        config.getString(Keys.DATABASE_PASSWORD),
+                        config.getString(Keys.DATABASE_DRIVER),
+                        null, null, null, resourceAccessor);
 
-            try (Liquibase liquibase = new Liquibase(changelog, resourceAccessor, database)) {
-                liquibase.clearCheckSums();
-                liquibase.update(new Contexts());
+                try (Liquibase liquibase = new Liquibase(changelogName, resourceAccessor, database)) {
+                    liquibase.clearCheckSums();
+                    liquibase.update(new Contexts());
+                }
+            } catch (LockException e) {
+                throw new DatabaseLockException();
             }
         }
 
         return dataSource;
     }
 
+}
+
+class DatabaseLockException extends RuntimeException {
+    DatabaseLockException() {
+        super("Database is in a locked state. "
+                + "It could be due to early service termination on a previous launch. "
+                + "To unlock you can run this query: 'UPDATE DATABASECHANGELOGLOCK SET locked = 0'. "
+                + "Make sure the schema is up to date before unlocking the database.");
+    }
 }

@@ -23,7 +23,7 @@ import org.traccar.PipelineBuilder;
 import org.traccar.TrackerServer;
 import org.traccar.config.Config;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class Pt60Protocol extends BaseProtocol {
 
@@ -32,7 +32,7 @@ public class Pt60Protocol extends BaseProtocol {
         addServer(new TrackerServer(config, getName(), false) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {
-                pipeline.addLast(new CharacterDelimiterFrameDecoder(1024, "@R#@", "@E#@"));
+                pipeline.addLast(new CharacterDelimiterFrameDecoder(MAX_FRAME_LENGTH, "@R#@", "@E#@"));
                 pipeline.addLast(new StringEncoder());
                 pipeline.addLast(new StringDecoder());
                 pipeline.addLast(new Pt60ProtocolDecoder(Pt60Protocol.this));

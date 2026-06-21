@@ -21,7 +21,7 @@ import org.traccar.PipelineBuilder;
 import org.traccar.TrackerServer;
 import org.traccar.config.Config;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class TzoneProtocol extends BaseProtocol {
 
@@ -30,7 +30,7 @@ public class TzoneProtocol extends BaseProtocol {
         addServer(new TrackerServer(config, getName(), false) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {
-                pipeline.addLast(new LengthFieldBasedFrameDecoder(256, 2, 2, 2, 0));
+                pipeline.addLast(new LengthFieldBasedFrameDecoder(MAX_FRAME_LENGTH, 2, 2, 2, 0));
                 pipeline.addLast(new TzoneProtocolDecoder(TzoneProtocol.this));
             }
         });

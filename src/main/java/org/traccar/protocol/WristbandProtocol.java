@@ -21,7 +21,7 @@ import org.traccar.PipelineBuilder;
 import org.traccar.TrackerServer;
 import org.traccar.config.Config;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class WristbandProtocol extends BaseProtocol {
 
@@ -30,7 +30,7 @@ public class WristbandProtocol extends BaseProtocol {
         addServer(new TrackerServer(config, getName(), false) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {
-                pipeline.addLast(new LengthFieldBasedFrameDecoder(1024, 3, 2, 3, 0));
+                pipeline.addLast(new LengthFieldBasedFrameDecoder(MAX_FRAME_LENGTH, 3, 2, 3, 0));
                 pipeline.addLast(new WristbandProtocolDecoder(WristbandProtocol.this));
             }
         });

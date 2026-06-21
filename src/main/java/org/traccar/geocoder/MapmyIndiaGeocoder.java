@@ -15,9 +15,9 @@
  */
 package org.traccar.geocoder;
 
-import javax.json.JsonArray;
-import javax.json.JsonObject;
-import javax.ws.rs.client.Client;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonObject;
+import jakarta.ws.rs.client.Client;
 
 public class MapmyIndiaGeocoder extends JsonGeocoder {
 
@@ -32,7 +32,7 @@ public class MapmyIndiaGeocoder extends JsonGeocoder {
         if (!results.isEmpty()) {
             Address address = new Address();
 
-            JsonObject result = (JsonObject) results.get(0);
+            JsonObject result = (JsonObject) results.getFirst();
 
             if (result.containsKey("formatted_address")) {
                 address.setFormattedAddress(result.getString("formatted_address"));

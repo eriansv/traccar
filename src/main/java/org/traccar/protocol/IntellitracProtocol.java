@@ -22,7 +22,7 @@ import org.traccar.PipelineBuilder;
 import org.traccar.TrackerServer;
 import org.traccar.config.Config;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class IntellitracProtocol extends BaseProtocol {
 
@@ -31,7 +31,7 @@ public class IntellitracProtocol extends BaseProtocol {
         addServer(new TrackerServer(config, getName(), false) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {
-                pipeline.addLast(new IntellitracFrameDecoder(1024));
+                pipeline.addLast(new IntellitracFrameDecoder(MAX_FRAME_LENGTH));
                 pipeline.addLast(new StringEncoder());
                 pipeline.addLast(new StringDecoder());
                 pipeline.addLast(new IntellitracProtocolDecoder(IntellitracProtocol.this));

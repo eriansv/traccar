@@ -48,13 +48,19 @@ public class TopinProtocolDecoder extends BaseProtocolDecoder {
     public static final int MSG_GPS = 0x10;
     public static final int MSG_GPS_OFFLINE = 0x11;
     public static final int MSG_STATUS = 0x13;
+    public static final int MSG_SLEEP = 0x14;
+    public static final int MSG_FACTORY_RESET = 0x15;
     public static final int MSG_WIFI_OFFLINE = 0x17;
+    public static final int MSG_LBS_WIFI = 0x18;
+    public static final int MSG_LBS_WIFI_OFFLINE = 0x19;
+    public static final int MSG_LBS_WIFI_2 = 0x1A;
     public static final int MSG_TIME_UPDATE = 0x30;
     public static final int MSG_SOS_NUMBER = 0x41;
     public static final int MSG_WIFI = 0x69;
     public static final int MSG_VIBRATION_ON = 0x92;
     public static final int MSG_VIBRATION_OFF = 0x93;
     public static final int MSG_VIBRATION = 0x94;
+    public static final int MSG_SOS_ALARM = 0x99;
 
     private void sendResponse(Channel channel, int length, int type, ByteBuf content) {
         if (channel != null) {
@@ -89,7 +95,7 @@ public class TopinProtocolDecoder extends BaseProtocolDecoder {
         int degrees = buf.readUnsignedByte();
         boolean negative = (buf.getUnsignedByte(buf.readerIndex()) & 0xf0) > 0;
         int decimal = buf.readUnsignedMedium() & 0x0fffff;
-        double result = degrees + decimal * 0.000001;
+        double result = degrees + decimal / 1000000.0;
         return negative ? -result : result;
     }
 
@@ -171,7 +177,7 @@ public class TopinProtocolDecoder extends BaseProtocolDecoder {
 
             if (buf.readableBytes() >= 5) {
                 position.setAltitude(buf.readShort());
-                position.set(Position.KEY_ALARM, decodeAlarm(buf.readUnsignedByte()));
+                position.addAlarm(decodeAlarm(buf.readUnsignedByte()));
             }
 
             ByteBuf content = Unpooled.buffer();
@@ -216,7 +222,8 @@ public class TopinProtocolDecoder extends BaseProtocolDecoder {
 
             return position;
 
-        } else if (type == MSG_WIFI || type == MSG_WIFI_OFFLINE) {
+        } else if (type == MSG_WIFI || type == MSG_WIFI_OFFLINE
+                || type == MSG_LBS_WIFI || type == MSG_LBS_WIFI_2 || type == MSG_LBS_WIFI_OFFLINE) {
 
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
@@ -250,7 +257,7 @@ public class TopinProtocolDecoder extends BaseProtocolDecoder {
             }
 
             if (buf.readableBytes() > 2) {
-                position.set(Position.KEY_ALARM, decodeAlarm(buf.readUnsignedByte()));
+                position.addAlarm(decodeAlarm(buf.readUnsignedByte()));
             }
 
             position.setNetwork(network);
@@ -268,7 +275,18 @@ public class TopinProtocolDecoder extends BaseProtocolDecoder {
 
             getLastLocation(position, null);
 
-            position.set(Position.KEY_ALARM, Position.ALARM_VIBRATION);
+            position.addAlarm(Position.ALARM_VIBRATION);
+
+            return position;
+
+        } else if (type == MSG_SOS_ALARM) {
+
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+
+            getLastLocation(position, null);
+
+            position.addAlarm(Position.ALARM_SOS);
 
             return position;
 

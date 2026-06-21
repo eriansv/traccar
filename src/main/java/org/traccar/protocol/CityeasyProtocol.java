@@ -22,7 +22,7 @@ import org.traccar.TrackerServer;
 import org.traccar.config.Config;
 import org.traccar.model.Command;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class CityeasyProtocol extends BaseProtocol {
 
@@ -36,7 +36,7 @@ public class CityeasyProtocol extends BaseProtocol {
         addServer(new TrackerServer(config, getName(), false) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {
-                pipeline.addLast(new LengthFieldBasedFrameDecoder(1024, 2, 2, -4, 0));
+                pipeline.addLast(new LengthFieldBasedFrameDecoder(MAX_FRAME_LENGTH, 2, 2, -4, 0));
                 pipeline.addLast(new CityeasyProtocolEncoder(CityeasyProtocol.this));
                 pipeline.addLast(new CityeasyProtocolDecoder(CityeasyProtocol.this));
             }

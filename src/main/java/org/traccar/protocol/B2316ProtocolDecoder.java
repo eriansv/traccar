@@ -24,9 +24,9 @@ import org.traccar.model.Network;
 import org.traccar.model.Position;
 import org.traccar.model.WifiAccessPoint;
 
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonObject;
+import jakarta.json.Json;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonObject;
 import java.io.StringReader;
 import java.net.SocketAddress;
 import java.util.Date;
@@ -40,35 +40,24 @@ public class B2316ProtocolDecoder extends BaseProtocolDecoder {
     }
 
     private String decodeAlarm(int value) {
-        switch (value) {
-            case 1:
-                return Position.ALARM_LOW_BATTERY;
-            case 2:
-                return Position.ALARM_SOS;
-            case 3:
-                return Position.ALARM_POWER_OFF;
-            case 4:
-                return Position.ALARM_REMOVING;
-            default:
-                return null;
-        }
+        return switch (value) {
+            case 1 -> Position.ALARM_LOW_BATTERY;
+            case 2 -> Position.ALARM_SOS;
+            case 3 -> Position.ALARM_POWER_OFF;
+            case 4 -> Position.ALARM_REMOVING;
+            default -> null;
+        };
     }
 
     private Integer decodeBattery(int value) {
-        switch (value) {
-            case 0:
-                return 10;
-            case 1:
-                return 30;
-            case 2:
-                return 60;
-            case 3:
-                return 80;
-            case 4:
-                return 100;
-            default:
-                return null;
-        }
+        return switch (value) {
+            case 0 -> 10;
+            case 1 -> 30;
+            case 2 -> 60;
+            case 3 -> 80;
+            case 4 -> 100;
+            default -> null;
+        };
     }
 
     @Override
@@ -84,14 +73,13 @@ public class B2316ProtocolDecoder extends BaseProtocolDecoder {
 
         List<Position> positions = new LinkedList<>();
         JsonArray data = root.getJsonArray("data");
-        for (int i = 0; i < data.size(); i++) {
+        for (JsonObject item : data.getValuesAs(JsonObject.class)) {
 
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
 
             Network network = new Network();
 
-            JsonObject item = data.getJsonObject(i);
             Date time = new Date(item.getJsonNumber("tm").longValue() * 1000);
 
             if (item.containsKey("gp")) {
@@ -123,7 +111,7 @@ public class B2316ProtocolDecoder extends BaseProtocolDecoder {
             }
 
             if (item.containsKey("wn")) {
-                position.set(Position.KEY_ALARM, decodeAlarm(item.getInt("wn")));
+                position.addAlarm(decodeAlarm(item.getInt("wn")));
             }
             if (item.containsKey("ic")) {
                 position.set(Position.KEY_ICCID, item.getString("ic"));
@@ -134,7 +122,7 @@ public class B2316ProtocolDecoder extends BaseProtocolDecoder {
             if (item.containsKey("te")) {
                 String[] temperatures = item.getString("te").split(",");
                 for (int j = 0; j < temperatures.length; j++) {
-                    position.set(Position.PREFIX_TEMP + (j + 1), Integer.parseInt(temperatures[j]) * 0.1);
+                    position.set(Position.PREFIX_TEMP + (j + 1), Integer.parseInt(temperatures[j]) / 10.0);
                 }
             }
             if (item.containsKey("st")) {

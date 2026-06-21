@@ -141,10 +141,10 @@ public class Gl200BinaryProtocolDecoder extends BaseProtocolDecoder {
 
                 position.setValid(true);
                 position.setTime(new Date(time * 1000));
-                position.setSpeed(UnitsConverter.knotsFromKph(speed * 0.1));
+                position.setSpeed(UnitsConverter.knotsFromKph(speed / 10.0));
                 position.setCourse(heading);
-                position.setLongitude(longitude * 0.000001);
-                position.setLatitude(latitude * 0.000001);
+                position.setLongitude(longitude / 1000000.0);
+                position.setLatitude(latitude / 1000000.0);
 
                 positions.add(position);
 
@@ -167,11 +167,11 @@ public class Gl200BinaryProtocolDecoder extends BaseProtocolDecoder {
                 position.setValid(hdop > 0);
                 position.set(Position.KEY_HDOP, hdop);
 
-                position.setSpeed(UnitsConverter.knotsFromKph(buf.readUnsignedMedium() * 0.1));
+                position.setSpeed(UnitsConverter.knotsFromKph(buf.readUnsignedMedium() / 10.0));
                 position.setCourse(buf.readUnsignedShort());
                 position.setAltitude(buf.readShort());
-                position.setLongitude(buf.readInt() * 0.000001);
-                position.setLatitude(buf.readInt() * 0.000001);
+                position.setLongitude(buf.readInt() / 1000000.0);
+                position.setLatitude(buf.readInt() / 1000000.0);
 
                 position.setTime(decodeTime(buf));
 
@@ -230,52 +230,39 @@ public class Gl200BinaryProtocolDecoder extends BaseProtocolDecoder {
         position.set(Position.KEY_SATELLITES, buf.readUnsignedByte());
 
         switch (type) {
-            case MSG_EVT_BPL:
-                buf.readUnsignedShort(); // backup battery voltage
-                break;
-            case MSG_EVT_VGN:
-            case MSG_EVT_VGF:
+            case MSG_EVT_BPL -> buf.readUnsignedShort(); // backup battery voltage
+            case MSG_EVT_VGN, MSG_EVT_VGF -> {
                 buf.readUnsignedShort(); // reserved
                 buf.readUnsignedByte(); // report type
                 buf.readUnsignedInt(); // ignition duration
-                break;
-            case MSG_EVT_UPD:
+            }
+            case MSG_EVT_UPD -> {
                 buf.readUnsignedShort(); // code
                 buf.readUnsignedByte(); // retry
-                break;
-            case MSG_EVT_IDF:
-                buf.readUnsignedInt(); // idling duration
-                break;
-            case MSG_EVT_GSS:
+            }
+            case MSG_EVT_IDF -> buf.readUnsignedInt(); // idling duration
+            case MSG_EVT_GSS -> {
                 buf.readUnsignedByte(); // gps signal status
                 buf.readUnsignedInt(); // reserved
-                break;
-            case MSG_EVT_GES:
+            }
+            case MSG_EVT_GES -> {
                 buf.readUnsignedShort(); // trigger geo id
                 buf.readUnsignedByte(); // trigger geo enable
                 buf.readUnsignedByte(); // trigger mode
                 buf.readUnsignedInt(); // radius
                 buf.readUnsignedInt(); // check interval
-                break;
-            case MSG_EVT_GPJ:
+            }
+            case MSG_EVT_GPJ -> {
                 buf.readUnsignedByte(); // cw jamming value
                 buf.readUnsignedByte(); // gps jamming state
-                break;
-            case MSG_EVT_RMD:
-                buf.readUnsignedByte(); // roaming state
-                break;
-            case MSG_EVT_JDS:
-                buf.readUnsignedByte(); // jamming state
-                break;
-            case MSG_EVT_CRA:
-                buf.readUnsignedByte(); // crash counter
-                break;
-            case MSG_EVT_UPC:
+            }
+            case MSG_EVT_RMD -> buf.readUnsignedByte(); // roaming state
+            case MSG_EVT_JDS -> buf.readUnsignedByte(); // jamming state
+            case MSG_EVT_CRA -> buf.readUnsignedByte(); // crash counter
+            case MSG_EVT_UPC -> {
                 buf.readUnsignedByte(); // command id
                 buf.readUnsignedShort(); // result
-                break;
-            default:
-                break;
+            }
         }
 
         buf.readUnsignedByte(); // count
@@ -284,11 +271,11 @@ public class Gl200BinaryProtocolDecoder extends BaseProtocolDecoder {
         position.setValid(hdop > 0);
         position.set(Position.KEY_HDOP, hdop);
 
-        position.setSpeed(UnitsConverter.knotsFromKph(buf.readUnsignedMedium() * 0.1));
+        position.setSpeed(UnitsConverter.knotsFromKph(buf.readUnsignedMedium() / 10.0));
         position.setCourse(buf.readUnsignedShort());
         position.setAltitude(buf.readShort());
-        position.setLongitude(buf.readInt() * 0.000001);
-        position.setLatitude(buf.readInt() * 0.000001);
+        position.setLongitude(buf.readInt() / 1000000.0);
+        position.setLatitude(buf.readInt() / 1000000.0);
 
         position.setTime(decodeTime(buf));
 
@@ -352,8 +339,8 @@ public class Gl200BinaryProtocolDecoder extends BaseProtocolDecoder {
 
         if (type == MSG_INF_BAT) {
             position.set(Position.KEY_CHARGE, buf.readUnsignedByte() != 0);
-            position.set(Position.KEY_POWER, buf.readUnsignedShort() * 0.001);
-            position.set(Position.KEY_BATTERY, buf.readUnsignedShort() * 0.001);
+            position.set(Position.KEY_POWER, buf.readUnsignedShort() / 1000.0);
+            position.set(Position.KEY_BATTERY, buf.readUnsignedShort() / 1000.0);
             position.set(Position.KEY_BATTERY_LEVEL, buf.readUnsignedByte());
         }
 
@@ -388,16 +375,12 @@ public class Gl200BinaryProtocolDecoder extends BaseProtocolDecoder {
 
         ByteBuf buf = (ByteBuf) msg;
 
-        switch (buf.readSlice(4).toString(StandardCharsets.US_ASCII)) {
-            case "+RSP":
-                return decodeLocation(channel, remoteAddress, buf);
-            case "+INF":
-                return decodeInformation(channel, remoteAddress, buf);
-            case "+EVT":
-                return decodeEvent(channel, remoteAddress, buf);
-            default:
-                return null;
-        }
+        return switch (buf.readSlice(4).toString(StandardCharsets.US_ASCII)) {
+            case "+RSP" -> decodeLocation(channel, remoteAddress, buf);
+            case "+INF" -> decodeInformation(channel, remoteAddress, buf);
+            case "+EVT" -> decodeEvent(channel, remoteAddress, buf);
+            default -> null;
+        };
     }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 - 2022 Anton Tananaev (anton@traccar.org)
+ * Copyright 2016 - 2026 Anton Tananaev (anton@traccar.org)
  * Copyright 2016 Andrey Kunitsyn (andrey@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +32,7 @@ import org.traccar.storage.query.Columns;
 import org.traccar.storage.query.Condition;
 import org.traccar.storage.query.Request;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -42,12 +42,17 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.stream.Stream;
 
 public class RouteReportProvider {
 
     private final Config config;
     private final ReportUtils reportUtils;
     private final Storage storage;
+
+    private final Map<String, Integer> namesCount = new HashMap<>();
 
     @Inject
     public RouteReportProvider(Config config, ReportUtils reportUtils, Storage storage) {
@@ -56,15 +61,24 @@ public class RouteReportProvider {
         this.storage = storage;
     }
 
-    public Collection<Position> getObjects(long userId, Collection<Long> deviceIds, Collection<Long> groupIds,
+    public Stream<Position> getObjects(long userId, Collection<Long> deviceIds, Collection<Long> groupIds,
             Date from, Date to) throws StorageException {
         reportUtils.checkPeriodLimit(from, to);
 
-        ArrayList<Position> result = new ArrayList<>();
-        for (Device device: DeviceUtil.getAccessibleDevices(storage, userId, deviceIds, groupIds)) {
-            result.addAll(PositionUtil.getPositions(storage, device.getId(), from, to));
-        }
-        return result;
+        return DeviceUtil.getAccessibleDevices(storage, userId, deviceIds, groupIds).stream()
+                .flatMap(device -> {
+                    try {
+                        return PositionUtil.getPositionsStream(storage, device.getId(), from, to);
+                    } catch (StorageException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+    }
+
+
+    private String getUniqueSheetName(String key) {
+        namesCount.compute(key, (k, value) -> value == null ? 1 : (value + 1));
+        return namesCount.get(key) > 1 ? key + '-' + namesCount.get(key) : key;
     }
 
     public void getExcel(OutputStream outputStream,
@@ -78,7 +92,7 @@ public class RouteReportProvider {
             var positions = PositionUtil.getPositions(storage, device.getId(), from, to);
             DeviceReportSection deviceRoutes = new DeviceReportSection();
             deviceRoutes.setDeviceName(device.getName());
-            sheetNames.add(WorkbookUtil.createSafeSheetName(deviceRoutes.getDeviceName()));
+            sheetNames.add(WorkbookUtil.createSafeSheetName(getUniqueSheetName(deviceRoutes.getDeviceName())));
             if (device.getGroupId() > 0) {
                 Group group = storage.getObject(Group.class, new Request(
                         new Columns.All(), new Condition.Equals("id", device.getGroupId())));

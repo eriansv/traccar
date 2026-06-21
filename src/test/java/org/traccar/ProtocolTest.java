@@ -3,6 +3,9 @@ package org.traccar;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -28,9 +31,12 @@ import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class ProtocolTest extends BaseTest {
 
@@ -92,6 +98,10 @@ public class ProtocolTest extends BaseTest {
         return new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, url, Unpooled.buffer(), headers, new DefaultHttpHeaders());
     }
 
+    protected DefaultFullHttpRequest request(HttpMethod method, String url, HttpHeaders headers, ByteBuf data) {
+        return new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, url, data, headers, new DefaultHttpHeaders());
+    }
+
     protected DefaultFullHttpResponse response(ByteBuf data) {
         return new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, data);
     }
@@ -117,15 +127,12 @@ public class ProtocolTest extends BaseTest {
             position = (Position) decodedObject;
         }
         switch (key) {
-            case "speed":
-                assertEquals(expected, position.getSpeed());
-                break;
-            case "course":
-                assertEquals(expected, position.getCourse());
-                break;
-            default:
-                assertEquals(expected, position.getAttributes().get(key));
-                break;
+            case "speed" -> assertEquals(expected, position.getSpeed());
+            case "course" -> assertEquals(expected, position.getCourse());
+            case "altitude" -> assertEquals(expected, position.getAltitude());
+            case "network" -> assertEquals(expected, position.getNetwork());
+
+            default -> assertEquals(expected, position.getAttributes().get(key));
         }
     }
 
@@ -156,7 +163,7 @@ public class ProtocolTest extends BaseTest {
     private void verifyDecodedList(Object decodedObject, boolean checkLocation, Position expected) {
 
         assertNotNull(decodedObject, "list is null");
-        assertTrue(decodedObject instanceof List, "not a list");
+        assertInstanceOf(List.class, decodedObject, "not a list");
         assertFalse(((List<?>) decodedObject).isEmpty(), "list is empty");
 
         for (Object item : (List<?>) decodedObject) {
@@ -168,7 +175,7 @@ public class ProtocolTest extends BaseTest {
     private void verifyDecodedPosition(Object decodedObject, boolean checkLocation, boolean checkAttributes, Position expected) {
 
         assertNotNull(decodedObject, "position is null");
-        assertTrue(decodedObject instanceof Position, "not a position");
+        assertInstanceOf(Position.class, decodedObject, "not a position");
 
         Position position = (Position) decodedObject;
 
@@ -222,51 +229,55 @@ public class ProtocolTest extends BaseTest {
         }
 
         if (attributes.containsKey(Position.KEY_INDEX)) {
-            assertTrue(attributes.get(Position.KEY_INDEX) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_INDEX));
         }
 
         if (attributes.containsKey(Position.KEY_HDOP)) {
-            assertTrue(attributes.get(Position.KEY_HDOP) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_HDOP));
         }
 
         if (attributes.containsKey(Position.KEY_VDOP)) {
-            assertTrue(attributes.get(Position.KEY_VDOP) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_VDOP));
         }
 
         if (attributes.containsKey(Position.KEY_PDOP)) {
-            assertTrue(attributes.get(Position.KEY_PDOP) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_PDOP));
         }
 
         if (attributes.containsKey(Position.KEY_SATELLITES)) {
-            assertTrue(attributes.get(Position.KEY_SATELLITES) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_SATELLITES));
         }
 
         if (attributes.containsKey(Position.KEY_SATELLITES_VISIBLE)) {
-            assertTrue(attributes.get(Position.KEY_SATELLITES_VISIBLE) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_SATELLITES_VISIBLE));
         }
 
         if (attributes.containsKey(Position.KEY_RSSI)) {
-            assertTrue(attributes.get(Position.KEY_RSSI) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_RSSI));
         }
 
         if (attributes.containsKey(Position.KEY_ODOMETER)) {
-            assertTrue(attributes.get(Position.KEY_ODOMETER) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_ODOMETER));
         }
 
         if (attributes.containsKey(Position.KEY_RPM)) {
-            assertTrue(attributes.get(Position.KEY_RPM) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_RPM));
         }
 
-        if (attributes.containsKey(Position.KEY_FUEL_LEVEL)) {
-            assertTrue(attributes.get(Position.KEY_FUEL_LEVEL) instanceof Number);
+        if (attributes.containsKey(Position.KEY_FUEL)) {
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_FUEL));
+        }
+
+        if (attributes.containsKey(Position.KEY_FUEL_USED)) {
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_FUEL_USED));
         }
 
         if (attributes.containsKey(Position.KEY_POWER)) {
-            assertTrue(attributes.get(Position.KEY_POWER) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_POWER));
         }
 
         if (attributes.containsKey(Position.KEY_BATTERY)) {
-            assertTrue(attributes.get(Position.KEY_BATTERY) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_BATTERY));
         }
 
         if (attributes.containsKey(Position.KEY_BATTERY_LEVEL)) {
@@ -275,39 +286,39 @@ public class ProtocolTest extends BaseTest {
         }
 
         if (attributes.containsKey(Position.KEY_CHARGE)) {
-            assertTrue(attributes.get(Position.KEY_CHARGE) instanceof Boolean);
+            assertInstanceOf(Boolean.class, attributes.get(Position.KEY_CHARGE));
         }
 
         if (attributes.containsKey(Position.KEY_IGNITION)) {
-            assertTrue(attributes.get(Position.KEY_IGNITION) instanceof Boolean);
+            assertInstanceOf(Boolean.class, attributes.get(Position.KEY_IGNITION));
         }
 
         if (attributes.containsKey(Position.KEY_MOTION)) {
-            assertTrue(attributes.get(Position.KEY_MOTION) instanceof Boolean);
+            assertInstanceOf(Boolean.class, attributes.get(Position.KEY_MOTION));
         }
 
         if (attributes.containsKey(Position.KEY_ARCHIVE)) {
-            assertTrue(attributes.get(Position.KEY_ARCHIVE) instanceof Boolean);
+            assertInstanceOf(Boolean.class, attributes.get(Position.KEY_ARCHIVE));
         }
 
         if (attributes.containsKey(Position.KEY_DRIVER_UNIQUE_ID)) {
-            assertTrue(attributes.get(Position.KEY_DRIVER_UNIQUE_ID) instanceof String);
+            assertInstanceOf(String.class, attributes.get(Position.KEY_DRIVER_UNIQUE_ID));
         }
 
         if (attributes.containsKey(Position.KEY_STEPS)) {
-            assertTrue(attributes.get(Position.KEY_STEPS) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_STEPS));
         }
 
         if (attributes.containsKey(Position.KEY_ROAMING)) {
-            assertTrue(attributes.get(Position.KEY_ROAMING) instanceof Boolean);
+            assertInstanceOf(Boolean.class, attributes.get(Position.KEY_ROAMING));
         }
 
         if (attributes.containsKey(Position.KEY_HOURS)) {
-            assertTrue(attributes.get(Position.KEY_HOURS) instanceof Number);
+            assertInstanceOf(Number.class, attributes.get(Position.KEY_HOURS));
         }
 
         if (attributes.containsKey(Position.KEY_RESULT)) {
-            assertTrue(attributes.get(Position.KEY_RESULT) instanceof String);
+            assertInstanceOf(String.class, attributes.get(Position.KEY_RESULT));
         }
 
         if (position.getNetwork() != null) {
@@ -342,9 +353,19 @@ public class ProtocolTest extends BaseTest {
         verifyFrame(expected, encoder.encodeCommand(command));
     }
 
+    protected Object encodeCommand(
+            BaseProtocolEncoder encoder, BaseProtocolDecoder decoder, Command command) {
+        var pipeline = mock(ChannelPipeline.class);
+        when(pipeline.iterator()).thenReturn(
+                List.<Map.Entry<String, ChannelHandler>>of(Map.entry("decoder", decoder)).iterator());
+        var channel = mock(Channel.class);
+        when(channel.pipeline()).thenReturn(pipeline);
+        return encoder.encodeCommand(channel, command);
+    }
+
     protected void verifyFrame(ByteBuf expected, Object object) {
         assertNotNull(object, "buffer is null");
-        assertTrue(object instanceof ByteBuf, "not a buffer");
+        assertInstanceOf(ByteBuf.class, object, "not a buffer");
         assertEquals(ByteBufUtil.hexDump(expected), ByteBufUtil.hexDump((ByteBuf) object));
     }
 

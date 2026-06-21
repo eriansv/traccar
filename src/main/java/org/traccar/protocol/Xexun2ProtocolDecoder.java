@@ -78,7 +78,7 @@ public class Xexun2ProtocolDecoder extends BaseProtocolDecoder {
     }
 
     private double convertCoordinate(double value) {
-        double degrees = Math.floor(value / 100);
+        double degrees = (int) (value / 100);
         double minutes = value - degrees * 100;
         return degrees + minutes / 60;
     }
@@ -139,7 +139,7 @@ public class Xexun2ProtocolDecoder extends BaseProtocolDecoder {
                 int mask = buf.readUnsignedByte();
 
                 if (BitUtil.check(mask, 0)) {
-                    position.set(Position.KEY_ALARM, decodeAlarm(buf.readUnsignedInt()));
+                    position.addAlarm(decodeAlarm(buf.readUnsignedInt()));
                 }
                 if (BitUtil.check(mask, 1)) {
                     int positionMask = buf.readUnsignedByte();
@@ -156,7 +156,7 @@ public class Xexun2ProtocolDecoder extends BaseProtocolDecoder {
                         for (int j = 0; j < wifiCount; j++) {
                             String mac = ByteBufUtil.hexDump(buf.readSlice(6)).replaceAll("(..)", "$1:");
                             network.addWifiAccessPoint(WifiAccessPoint.from(
-                                    mac.substring(0, mac.length() - 1), buf.readUnsignedByte()));
+                                    mac.substring(0, mac.length() - 1), buf.readByte()));
                         }
                     }
                     if (BitUtil.check(positionMask, 2)) {
@@ -164,7 +164,7 @@ public class Xexun2ProtocolDecoder extends BaseProtocolDecoder {
                         for (int j = 0; j < cellCount; j++) {
                             network.addCellTower(CellTower.from(
                                     buf.readUnsignedShort(), buf.readUnsignedShort(),
-                                    buf.readInt(), buf.readUnsignedInt(), buf.readUnsignedByte()));
+                                    buf.readInt(), buf.readUnsignedInt(), buf.readByte()));
                         }
                     }
                     if (network.getWifiAccessPoints() != null || network.getCellTowers() != null) {
@@ -174,8 +174,8 @@ public class Xexun2ProtocolDecoder extends BaseProtocolDecoder {
                         buf.skipBytes(12 * buf.readUnsignedByte()); // tof
                     }
                     if (BitUtil.check(positionMask, 5)) {
-                        position.setSpeed(UnitsConverter.knotsFromKph(buf.readUnsignedShort() * 0.1));
-                        position.setCourse(buf.readUnsignedShort() * 0.1);
+                        position.setSpeed(UnitsConverter.knotsFromKph(buf.readUnsignedShort() / 10.0));
+                        position.setCourse(buf.readUnsignedShort() / 10.0);
                     }
                     if (BitUtil.check(positionMask, 6)) {
                         position.setValid(true);
@@ -196,8 +196,8 @@ public class Xexun2ProtocolDecoder extends BaseProtocolDecoder {
                                 position.setValid(buf.readUnsignedByte() > 0);
                                 position.set(Position.KEY_SATELLITES, buf.readUnsignedByte());
                                 buf.readUnsignedByte(); // satellite signal-to-noise ratio
-                                position.setSpeed(UnitsConverter.knotsFromKph(buf.readUnsignedShort() * 0.1));
-                                position.setCourse(buf.readUnsignedShort() * 0.1);
+                                position.setSpeed(UnitsConverter.knotsFromKph(buf.readUnsignedShort() / 10.0));
+                                position.setCourse(buf.readUnsignedShort() / 10.0);
                                 position.setAltitude(buf.readFloat());
                             }
                             buf.readerIndex(dataEndIndex);

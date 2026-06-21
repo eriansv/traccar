@@ -22,7 +22,7 @@ import org.traccar.TrackerServer;
 import org.traccar.config.Config;
 import org.traccar.model.Command;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class KhdProtocol extends BaseProtocol {
 
@@ -40,7 +40,7 @@ public class KhdProtocol extends BaseProtocol {
         addServer(new TrackerServer(config, getName(), false) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {
-                pipeline.addLast(new LengthFieldBasedFrameDecoder(512, 3, 2));
+                pipeline.addLast(new LengthFieldBasedFrameDecoder(MAX_FRAME_LENGTH, 3, 2));
                 pipeline.addLast(new KhdProtocolEncoder(KhdProtocol.this));
                 pipeline.addLast(new KhdProtocolDecoder(KhdProtocol.this));
             }

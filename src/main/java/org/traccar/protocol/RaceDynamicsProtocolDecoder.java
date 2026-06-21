@@ -144,10 +144,10 @@ public class RaceDynamicsProtocolDecoder extends BaseProtocolDecoder {
                     position.set(Position.KEY_IGNITION, parser.nextInt() == 1);
                     position.set(Position.KEY_INDEX, parser.nextInt());
                     position.set(Position.KEY_DRIVER_UNIQUE_ID, parser.next());
-                    position.set(Position.KEY_POWER, parser.nextInt() * 0.01);
-                    position.set(Position.KEY_BATTERY, parser.nextInt() * 0.01);
-                    position.set(Position.KEY_ALARM, parser.nextInt() > 0 ? Position.ALARM_SOS : null);
-                    position.set(Position.KEY_ALARM, parser.nextInt() > 0 ? Position.ALARM_OVERSPEED : null);
+                    position.set(Position.KEY_POWER, parser.nextInt() / 100.0);
+                    position.set(Position.KEY_BATTERY, parser.nextInt() / 100.0);
+                    position.addAlarm(parser.nextInt() > 0 ? Position.ALARM_SOS : null);
+                    position.addAlarm(parser.nextInt() > 0 ? Position.ALARM_OVERSPEED : null);
 
                     int overDriver = parser.nextInt();
                     if (overDriver > 0) {

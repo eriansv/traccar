@@ -24,8 +24,7 @@ import io.netty.buffer.Unpooled;
 
 public final class BufferUtil {
 
-    private BufferUtil() {
-    }
+    private BufferUtil() {}
 
     public static int readSignedMagnitudeInt(ByteBuf buffer) {
         long value = buffer.readUnsignedInt();
@@ -69,6 +68,31 @@ public final class BufferUtil {
             haystack.readerIndex(originalReaderIndex);
             haystack.writerIndex(originalWriterIndex);
         }
+    }
+
+    public static boolean isPrintable(ByteBuf buf, int length) {
+        boolean printable = true;
+        for (int i = 0; i < length; i++) {
+            byte b = buf.getByte(buf.readerIndex() + i);
+            if (b < 32 && b != '\r' && b != '\n') {
+                printable = false;
+                break;
+            }
+        }
+        return printable;
+    }
+
+    public static String readString(ByteBuf buf, int length) {
+        return buf.readCharSequence(length, StandardCharsets.US_ASCII).toString();
+    }
+
+    public static String readDecimalDigits(ByteBuf buf, int byteCount) {
+        StringBuilder builder = new StringBuilder(byteCount * 2);
+        for (int i = 0; i < byteCount; i++) {
+            int b = buf.readUnsignedByte();
+            builder.append(b / 10).append(b % 10);
+        }
+        return builder.toString();
     }
 
 }

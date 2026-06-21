@@ -111,29 +111,22 @@ public class PluginProtocolDecoder extends BaseProtocolDecoder {
         }
         position.set(Position.KEY_STATUS, status);
 
-        position.set(Position.KEY_FUEL_LEVEL, parser.nextDouble());
+        position.set(Position.KEY_FUEL, parser.nextDouble());
 
         if (parser.hasNext(6)) {
             position.set(Position.PREFIX_TEMP + 1, parser.nextDouble());
             position.set(Position.PREFIX_TEMP + 2, parser.nextDouble());
             position.set(Position.KEY_RPM, parser.nextInt());
             position.set(Position.KEY_OBD_SPEED, parser.nextInt());
-            position.set(Position.KEY_THROTTLE, parser.nextInt() * 0.1);
-            position.set(Position.KEY_POWER, parser.nextInt() * 0.1);
+            position.set(Position.KEY_THROTTLE, parser.nextInt() / 10.0);
+            position.set(Position.KEY_POWER, parser.nextInt() / 10.0);
         }
 
         if (parser.hasNext()) {
             int event = parser.nextInt();
             switch (event) {
-                case 11317:
-                    position.set(Position.KEY_ALARM, Position.ALARM_ACCELERATION);
-                    break;
-                case 11319:
-                    position.set(Position.KEY_ALARM, Position.ALARM_BRAKING);
-                    break;
-                default:
-                    break;
-
+                case 11317 -> position.addAlarm(Position.ALARM_ACCELERATION);
+                case 11319 -> position.addAlarm(Position.ALARM_BRAKING);
             }
             position.set(Position.KEY_EVENT, event);
         }

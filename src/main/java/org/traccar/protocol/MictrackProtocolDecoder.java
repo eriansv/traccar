@@ -21,6 +21,7 @@ import org.traccar.BaseProtocolDecoder;
 import org.traccar.session.DeviceSession;
 import org.traccar.Protocol;
 import org.traccar.helper.DateBuilder;
+import org.traccar.helper.DateUtil;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
 import org.traccar.helper.UnitsConverter;
@@ -30,16 +31,16 @@ import org.traccar.model.Position;
 import org.traccar.model.WifiAccessPoint;
 
 import java.net.SocketAddress;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.TimeZone;
 import java.util.regex.Pattern;
 
 public class MictrackProtocolDecoder extends BaseProtocolDecoder {
+
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter
+            .ofPattern("yyMMddHHmmss").withZone(ZoneOffset.UTC);
 
     public MictrackProtocolDecoder(Protocol protocol) {
         super(protocol);
@@ -58,48 +59,35 @@ public class MictrackProtocolDecoder extends BaseProtocolDecoder {
             .number("(dd)(dd)(dd)")              // date (ddmmyy)
             .compile();
 
-    private Date decodeTime(String data) throws ParseException {
-        DateFormat dateFormat = new SimpleDateFormat("yyMMddHHmmss");
-        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return dateFormat.parse(data);
-    }
-
     private String decodeAlarm(int event) {
-        switch (event) {
-            case 0:
-                return Position.ALARM_POWER_ON;
-            case 5:
-                return Position.ALARM_SOS;
-            case 8:
-                return Position.ALARM_LOW_BATTERY;
-            case 9:
-                return Position.ALARM_GEOFENCE_ENTER;
-            case 10:
-                return Position.ALARM_GEOFENCE_EXIT;
-            case 12:
-                return Position.ALARM_POWER_OFF;
-            default:
-                return null;
-        }
+        return switch (event) {
+            case 0 -> Position.ALARM_POWER_ON;
+            case 5 -> Position.ALARM_SOS;
+            case 8 -> Position.ALARM_LOW_BATTERY;
+            case 9 -> Position.ALARM_GEOFENCE_ENTER;
+            case 10 -> Position.ALARM_GEOFENCE_EXIT;
+            case 12 -> Position.ALARM_POWER_OFF;
+            default -> null;
+        };
     }
 
-    private void decodeLocation(Position position, String data) throws ParseException {
+    private void decodeLocation(Position position, String data) {
         int index = 0;
         String[] values = data.split("\\+");
 
         position.set(Position.KEY_SATELLITES, Integer.parseInt(values[index++]));
 
         position.setValid(true);
-        position.setTime(decodeTime(values[index++]));
+        position.setTime(DateUtil.parse(DATE_FORMAT, values[index++]));
         position.setLatitude(Double.parseDouble(values[index++]));
         position.setLongitude(Double.parseDouble(values[index++]));
         position.setSpeed(UnitsConverter.knotsFromKph(Double.parseDouble(values[index++])));
         position.setCourse(Integer.parseInt(values[index++]));
 
         int event = Integer.parseInt(values[index++]);
-        position.set(Position.KEY_ALARM, decodeAlarm(event));
+        position.addAlarm(decodeAlarm(event));
         position.set(Position.KEY_EVENT, event);
-        position.set(Position.KEY_BATTERY, Integer.parseInt(values[index++]) * 0.001);
+        position.set(Position.KEY_BATTERY, Integer.parseInt(values[index++]) / 1000.0);
     }
 
     private void decodeCell(Network network, String data) {
@@ -125,11 +113,11 @@ public class MictrackProtocolDecoder extends BaseProtocolDecoder {
     }
 
     private void decodeNetwork(
-            Position position, String data, boolean hasWifi, boolean hasSsid, boolean hasCell) throws ParseException {
+            Position position, String data, boolean hasWifi, boolean hasSsid, boolean hasCell) {
         int index = 0;
         String[] values = data.split("\\+");
 
-        getLastLocation(position, decodeTime(values[index++]));
+        getLastLocation(position, DateUtil.parse(DATE_FORMAT, values[index++]));
 
         Network network = new Network();
 
@@ -144,25 +132,25 @@ public class MictrackProtocolDecoder extends BaseProtocolDecoder {
         position.setNetwork(network);
 
         int event = Integer.parseInt(values[index++]);
-        position.set(Position.KEY_ALARM, decodeAlarm(event));
+        position.addAlarm(decodeAlarm(event));
         position.set(Position.KEY_EVENT, event);
-        position.set(Position.KEY_BATTERY, Integer.parseInt(values[index++]) * 0.001);
+        position.set(Position.KEY_BATTERY, Integer.parseInt(values[index++]) / 1000.0);
     }
 
-    private void decodeStatus(Position position, String data) throws ParseException {
+    private void decodeStatus(Position position, String data) {
         int index = 0;
         String[] values = data.split("\\+");
 
         position.set(Position.KEY_SATELLITES, Integer.parseInt(values[index++]));
 
-        getLastLocation(position, decodeTime(values[index++]));
+        getLastLocation(position, DateUtil.parse(DATE_FORMAT, values[index++]));
 
         index += 4; // fix values
 
         int event = Integer.parseInt(values[index++]);
-        position.set(Position.KEY_ALARM, decodeAlarm(event));
+        position.addAlarm(decodeAlarm(event));
         position.set(Position.KEY_EVENT, event);
-        position.set(Position.KEY_BATTERY, Integer.parseInt(values[index++]) * 0.001);
+        position.set(Position.KEY_BATTERY, Integer.parseInt(values[index++]) / 1000.0);
     }
 
     @Override
@@ -231,28 +219,15 @@ public class MictrackProtocolDecoder extends BaseProtocolDecoder {
         position.set(Position.KEY_TYPE, Integer.parseInt(fragments[1]));
 
         switch (fragments[3]) {
-            case "R0":
-                decodeLocation(position, fragments[4]);
-                break;
-            case "R1":
-                decodeNetwork(position, fragments[4], true, false, false);
-                break;
-            case "R2":
-            case "R3":
-                decodeNetwork(position, fragments[4], false, false, true);
-                break;
-            case "R12":
-            case "R13":
-                decodeNetwork(position, fragments[4], true, false, true);
-                break;
-            case "RH":
-                decodeStatus(position, fragments[4]);
-                break;
-            case "Y1":
-                decodeNetwork(position, fragments[4], true, true, false);
-                break;
-            default:
+            case "R0" -> decodeLocation(position, fragments[4]);
+            case "R1" -> decodeNetwork(position, fragments[4], true, false, false);
+            case "R2", "R3" -> decodeNetwork(position, fragments[4], false, false, true);
+            case "R12", "R13" -> decodeNetwork(position, fragments[4], true, false, true);
+            case "RH" -> decodeStatus(position, fragments[4]);
+            case "Y1" -> decodeNetwork(position, fragments[4], true, true, false);
+            default -> {
                 return null;
+            }
         }
 
         return position;

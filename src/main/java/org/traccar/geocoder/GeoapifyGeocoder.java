@@ -15,9 +15,10 @@
  */
 package org.traccar.geocoder;
 
-import javax.json.JsonArray;
-import javax.json.JsonObject;
-import javax.ws.rs.client.Client;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonObject;
+import jakarta.ws.rs.client.Client;
+import java.util.Locale;
 
 public class GeoapifyGeocoder extends JsonGeocoder {
 
@@ -67,7 +68,7 @@ public class GeoapifyGeocoder extends JsonGeocoder {
                 address.setState(result.getString("state"));
             }
             if (result.containsKey("country_code")) {
-                address.setCountry(result.getString("country_code").toUpperCase());
+                address.setCountry(result.getString("country_code").toUpperCase(Locale.ROOT));
             }
             if (result.containsKey("postcode")) {
                 address.setPostcode(result.getString("postcode"));

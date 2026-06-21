@@ -31,15 +31,11 @@ import org.traccar.model.Position;
 
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 public class MeiligaoProtocolDecoder extends BaseProtocolDecoder {
-
-    private final Map<Byte, ByteBuf> photos = new HashMap<>();
 
     public MeiligaoProtocolDecoder(Protocol protocol) {
         super(protocol);
@@ -141,6 +137,7 @@ public class MeiligaoProtocolDecoder extends BaseProtocolDecoder {
 
     public static final int MSG_OBD_RT = 0x9901;
     public static final int MSG_OBD_RTA = 0x9902;
+    public static final int MSG_DTC = 0x9903;
 
     public static final int MSG_TRACK_ON_DEMAND = 0x4101;
     public static final int MSG_TRACK_BY_INTERVAL = 0x4102;
@@ -208,30 +205,35 @@ public class MeiligaoProtocolDecoder extends BaseProtocolDecoder {
         }
     }
 
-    private String decodeAlarm(short value) {
-        switch (value) {
-            case 0x01:
-                return Position.ALARM_SOS;
-            case 0x10:
-                return Position.ALARM_LOW_BATTERY;
-            case 0x11:
-                return Position.ALARM_OVERSPEED;
-            case 0x12:
-                return Position.ALARM_MOVEMENT;
-            case 0x13:
-                return Position.ALARM_GEOFENCE_ENTER;
-            case 0x14:
-                return Position.ALARM_ACCIDENT;
-            case 0x50:
-                return Position.ALARM_POWER_OFF;
-            case 0x53:
-                return Position.ALARM_GPS_ANTENNA_CUT;
-            case 0x72:
-                return Position.ALARM_BRAKING;
-            case 0x73:
-                return Position.ALARM_ACCELERATION;
-            default:
-                return null;
+    private String decodeAlarm(String model, short value) {
+        if ("TK218".equals(model)) {
+            return switch (value) {
+                case 0x01 -> Position.ALARM_SOS;
+                case 0x10 -> Position.ALARM_LOW_BATTERY;
+                case 0x11 -> Position.ALARM_OVERSPEED;
+                case 0x12 -> Position.ALARM_MOVEMENT;
+                case 0x13 -> Position.ALARM_GEOFENCE;
+                case 0x60 -> Position.ALARM_FATIGUE_DRIVING;
+                case 0x71 -> Position.ALARM_BRAKING;
+                case 0x72 -> Position.ALARM_ACCELERATION;
+                case 0x73 -> Position.ALARM_ACCIDENT;
+                case 0x74 -> Position.ALARM_IDLE;
+                default -> null;
+            };
+        } else {
+            return switch (value) {
+                case 0x01 -> Position.ALARM_SOS;
+                case 0x10 -> Position.ALARM_LOW_BATTERY;
+                case 0x11 -> Position.ALARM_OVERSPEED;
+                case 0x12 -> Position.ALARM_MOVEMENT;
+                case 0x13 -> Position.ALARM_GEOFENCE_ENTER;
+                case 0x14 -> Position.ALARM_ACCIDENT;
+                case 0x50 -> Position.ALARM_POWER_OFF;
+                case 0x53 -> Position.ALARM_GPS_ANTENNA_CUT;
+                case 0x72 -> Position.ALARM_BRAKING;
+                case 0x73 -> Position.ALARM_ACCELERATION;
+                default -> null;
+            };
         }
     }
 
@@ -352,6 +354,12 @@ public class MeiligaoProtocolDecoder extends BaseProtocolDecoder {
         return position;
     }
 
+    private Position decodeDtc(Position position, String sentence) {
+        getLastLocation(position, null);
+        position.set(Position.KEY_DTCS, sentence.replace(',', ' '));
+        return position;
+    }
+
     private List<Position> decodeRetransmission(ByteBuf buf, DeviceSession deviceSession) {
         List<Position> positions = new LinkedList<>();
 
@@ -409,7 +417,7 @@ public class MeiligaoProtocolDecoder extends BaseProtocolDecoder {
             return null;
         } else if (command == MSG_UPLOAD_PHOTO) {
             byte imageIndex = buf.readByte();
-            photos.put(imageIndex, Unpooled.buffer());
+            newMediaBuffer();
             ByteBuf response = Unpooled.copiedBuffer(new byte[]{imageIndex});
             sendResponse(channel, remoteAddress, id, MSG_UPLOAD_PHOTO_RESPONSE, response);
             return null;
@@ -427,12 +435,12 @@ public class MeiligaoProtocolDecoder extends BaseProtocolDecoder {
 
         if (command == MSG_DATA_PHOTO) {
 
-            byte imageIndex = buf.readByte();
+            buf.readByte(); // image index
             buf.readUnsignedShort(); // image footage
             buf.readUnsignedByte(); // total packets
             buf.readUnsignedByte(); // packet index
 
-            photos.get(imageIndex).writeBytes(buf, buf.readableBytes() - 2 - 2);
+            getMediaBuffer().writeBytes(buf, buf.readableBytes() - 2 - 2);
 
             return null;
 
@@ -448,7 +456,8 @@ public class MeiligaoProtocolDecoder extends BaseProtocolDecoder {
 
             if (command == MSG_ALARM) {
                 short alarmCode = buf.readUnsignedByte();
-                position.set(Position.KEY_ALARM, decodeAlarm(alarmCode));
+                String model = getDeviceModel(deviceSession);
+                position.addAlarm(decodeAlarm(model, alarmCode));
                 if (alarmCode >= 0x02 && alarmCode <= 0x05) {
                     position.set(Position.PREFIX_IN + alarmCode, 1);
                 } else if (alarmCode >= 0x32 && alarmCode <= 0x35) {
@@ -466,33 +475,22 @@ public class MeiligaoProtocolDecoder extends BaseProtocolDecoder {
                     }
                 }
             } else if (command == MSG_POSITION_IMAGE) {
-                byte imageIndex = buf.readByte();
+                buf.readByte(); // image index
                 buf.readUnsignedByte(); // image upload type
-                ByteBuf photo = photos.remove(imageIndex);
-                try {
-                    position.set(Position.KEY_IMAGE, writeMediaFile(deviceSession.getUniqueId(), photo, "jpg"));
-                } finally {
-                    photo.release();
-                }
+                position.set(Position.KEY_IMAGE, writeMediaFile(deviceSession.getUniqueId(), "jpg"));
             }
 
             String sentence = buf.toString(buf.readerIndex(), buf.readableBytes() - 4, StandardCharsets.US_ASCII);
 
-            switch (command) {
-                case MSG_POSITION:
-                case MSG_POSITION_LOGGED:
-                case MSG_ALARM:
-                case MSG_POSITION_IMAGE:
-                    return decodeRegular(position, sentence);
-                case MSG_RFID:
-                    return decodeRfid(position, sentence);
-                case MSG_OBD_RT:
-                    return decodeObd(position, sentence);
-                case MSG_OBD_RTA:
-                    return decodeObdA(position, sentence);
-                default:
-                    return null;
-            }
+            return switch (command) {
+                case MSG_POSITION, MSG_POSITION_LOGGED, MSG_ALARM, MSG_POSITION_IMAGE ->
+                        decodeRegular(position, sentence);
+                case MSG_RFID -> decodeRfid(position, sentence);
+                case MSG_OBD_RT -> decodeObd(position, sentence);
+                case MSG_OBD_RTA -> decodeObdA(position, sentence);
+                case MSG_DTC -> decodeDtc(position, sentence);
+                default -> null;
+            };
 
         }
     }

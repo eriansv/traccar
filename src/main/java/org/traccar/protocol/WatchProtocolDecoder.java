@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 - 2023 Anton Tananaev (anton@traccar.org)
+ * Copyright 2015 - 2025 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,8 +40,6 @@ import java.util.regex.Pattern;
 
 public class WatchProtocolDecoder extends BaseProtocolDecoder {
 
-    private ByteBuf audio;
-
     public WatchProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
@@ -50,9 +48,9 @@ public class WatchProtocolDecoder extends BaseProtocolDecoder {
             .number("(dd)(dd)(dd),")             // date (ddmmyy)
             .number("(dd)(dd)(dd),")             // time (hhmmss)
             .expression("([AV]),")               // validity
-            .number(" *(-?d+.d+),")              // latitude
-            .expression("([NS]),")
-            .number(" *(-?d+.d+),")              // longitude
+            .number(" *(-?d+.?d*),")             // latitude
+            .expression("([NS])?,")
+            .number(" *(-?d+.?d*),")             // longitude
             .expression("([EW])?,")
             .number("(d+.?d*),")                 // speed
             .number("(d+.?d*),")                 // course
@@ -132,7 +130,7 @@ public class WatchProtocolDecoder extends BaseProtocolDecoder {
         position.set(Position.KEY_STEPS, parser.nextInt(0));
 
         int status = parser.nextHexInt(0);
-        position.set(Position.KEY_ALARM, decodeAlarm(status));
+        position.addAlarm(decodeAlarm(status));
         if (BitUtil.check(status, 4)) {
             position.set(Position.KEY_MOTION, true);
         }
@@ -269,7 +267,7 @@ public class WatchProtocolDecoder extends BaseProtocolDecoder {
 
             if (type.startsWith("AL")) {
                 if (position != null && !position.hasAttribute(Position.KEY_ALARM)) {
-                    position.set(Position.KEY_ALARM, Position.ALARM_GENERAL);
+                    position.addAlarm(Position.ALARM_GENERAL);
                 }
                 sendResponse(channel, id, index, "AL");
             }
@@ -285,7 +283,8 @@ public class WatchProtocolDecoder extends BaseProtocolDecoder {
                 || type.equalsIgnoreCase("BLOOD")
                 || type.equalsIgnoreCase("BPHRT")
                 || type.equalsIgnoreCase("TEMP")
-                || type.equalsIgnoreCase("btemp2")) {
+                || type.equalsIgnoreCase("btemp2")
+                || type.equalsIgnoreCase("oxygen")) {
 
             if (buf.isReadable()) {
 
@@ -303,6 +302,8 @@ public class WatchProtocolDecoder extends BaseProtocolDecoder {
                     if (Integer.parseInt(values[valueIndex++]) > 0) {
                         position.set(Position.PREFIX_TEMP + 1, Double.parseDouble(values[valueIndex]));
                     }
+                } else if (type.equalsIgnoreCase("oxygen")) {
+                    position.set("bloodOxygen", Integer.parseInt(values[++valueIndex]));
                 } else {
                     if (type.equalsIgnoreCase("BPHRT") || type.equalsIgnoreCase("BLOOD")) {
                         position.set("pressureHigh", values[valueIndex++]);
@@ -339,10 +340,10 @@ public class WatchProtocolDecoder extends BaseProtocolDecoder {
             int current = Integer.parseInt(values[2]);
             int total = Integer.parseInt(values[3]);
 
-            if (audio == null) {
-                audio = Unpooled.buffer();
+            if (getMediaBuffer() == null) {
+                newMediaBuffer();
             }
-            audio.writeBytes(buf);
+            getMediaBuffer().writeBytes(buf);
 
             sendResponse(channel, id, index, "JXTKR,1");
 
@@ -352,9 +353,7 @@ public class WatchProtocolDecoder extends BaseProtocolDecoder {
                 Position position = new Position(getProtocolName());
                 position.setDeviceId(deviceSession.getDeviceId());
                 getLastLocation(position, null);
-                position.set(Position.KEY_AUDIO, writeMediaFile(id, audio, "amr"));
-                audio.release();
-                audio = null;
+                position.set(Position.KEY_AUDIO, writeMediaFile(id, "amr"));
                 return position;
             }
 

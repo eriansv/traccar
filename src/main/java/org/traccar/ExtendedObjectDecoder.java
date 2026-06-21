@@ -23,11 +23,11 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
 import org.traccar.config.Config;
 import org.traccar.config.Keys;
-import org.traccar.handler.AcknowledgementHandler;
+import org.traccar.handler.network.AcknowledgementHandler;
 import org.traccar.helper.DataConverter;
 import org.traccar.model.Position;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
@@ -50,18 +50,15 @@ public abstract class ExtendedObjectDecoder extends ChannelInboundHandlerAdapter
     /**
      * Method called when config is initialized.
      */
-    protected void init() {
-    }
+    protected void init() {}
 
     private void saveOriginal(Object decodedMessage, Object originalMessage) {
-        if (getConfig().getBoolean(Keys.DATABASE_SAVE_ORIGINAL) && decodedMessage instanceof Position) {
-            Position position = (Position) decodedMessage;
-            if (originalMessage instanceof ByteBuf) {
-                ByteBuf buf = (ByteBuf) originalMessage;
+        if (getConfig().getBoolean(Keys.DATABASE_SAVE_ORIGINAL) && decodedMessage instanceof Position position) {
+            if (originalMessage instanceof ByteBuf buf) {
                 position.set(Position.KEY_ORIGINAL, ByteBufUtil.hexDump(buf, 0, buf.writerIndex()));
-            } else if (originalMessage instanceof String) {
+            } else if (originalMessage instanceof String stringMessage) {
                 position.set(Position.KEY_ORIGINAL, DataConverter.printHex(
-                        ((String) originalMessage).getBytes(StandardCharsets.US_ASCII)));
+                        stringMessage.getBytes(StandardCharsets.US_ASCII)));
             }
         }
     }
@@ -78,8 +75,7 @@ public abstract class ExtendedObjectDecoder extends ChannelInboundHandlerAdapter
                 decodedMessage = handleEmptyMessage(ctx.channel(), networkMessage.getRemoteAddress(), originalMessage);
             }
             if (decodedMessage != null) {
-                if (decodedMessage instanceof Collection) {
-                    var collection = (Collection) decodedMessage;
+                if (decodedMessage instanceof Collection collection) {
                     ctx.writeAndFlush(new AcknowledgementHandler.EventDecoded(collection));
                     for (Object o : collection) {
                         saveOriginal(o, originalMessage);
@@ -99,8 +95,7 @@ public abstract class ExtendedObjectDecoder extends ChannelInboundHandlerAdapter
     }
 
     protected void onMessageEvent(
-            Channel channel, SocketAddress remoteAddress, Object originalMessage, Object decodedMessage) {
-    }
+            Channel channel, SocketAddress remoteAddress, Object originalMessage, Object decodedMessage) {}
 
     protected Object handleEmptyMessage(Channel channel, SocketAddress remoteAddress, Object msg) {
         return null;
